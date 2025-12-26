@@ -274,7 +274,7 @@
             });
 
             sorted.forEach(p => {
-                if (p.isCompleted) return;
+                if (p.isCompleted || p.isDeleted) return;
                 const stage = p.stages[p.currentStageIndex];
                 const curIdx = p.currentStageIndex + 1;
                 const total = p.stages.length;
@@ -311,7 +311,9 @@
                         </div>
                     </div>`;
 
-                if (p.priority === '未開始') {
+                if (p.isDeleted) {
+                    // skip deleted projects from all bulletin sections
+                } else if (p.priority === '未開始') {
                     summaryNotStarted += summaryCard;
                 } else {
                     summaryActive += summaryCard;
