@@ -736,11 +736,44 @@
         
         function exportToCSV() { 
             syncDataFromDOM(); 
-            // 匯出完整專案資料（JSON），避免遺失階段內容
-            const json = JSON.stringify(projects, null, 2);
+            // 匯出為 Excel 友善的 CSV（每列代表一個階段）
+            const headers = [
+                "projectId","projectName","priority","baseDate","isCompleted","currentStageIndex","stageIndex",
+                "stageName","triggerType","time","unit","freqVal","freqUnit","notified","content"
+            ];
+            const rows = [headers.join(",")];
+
+            const esc = (val) => {
+                const str = (val ?? "").toString();
+                return `"${str.replace(/"/g,'""')}"`;
+            };
+
+            projects.forEach(p => {
+                (p.stages || []).forEach((s, idx) => {
+                    rows.push([
+                        esc(p.id),
+                        esc(p.name),
+                        esc(p.priority),
+                        esc(p.baseDate || ""),
+                        esc(p.isCompleted ? "1" : "0"),
+                        esc(p.currentStageIndex),
+                        esc(idx),
+                        esc(s.name),
+                        esc(s.triggerType),
+                        esc(s.time),
+                        esc(s.unit),
+                        esc(s.freqVal),
+                        esc(s.freqUnit),
+                        esc(s.notified ? "1" : "0"),
+                        esc(s.content || "")
+                    ].join(","));
+                });
+            });
+
+            const csv = "\uFEFF" + rows.join("\n");
             const link = document.createElement("a"); 
-            link.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); 
-            link.download = "Project_v35.json"; 
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); 
+            link.download = "Project_v35.csv"; 
             link.click(); 
         }
 
@@ -964,44 +997,90 @@
                     // 若非 JSON，則 fallback CSV
                 }
 
-                // CSV 匯入（僅基本欄位）
+                // CSV 匯入（每列一個階段）
                 const lines = text.split('\n').filter(line => line.trim() !== '');
-                const startIdx = lines[0].includes('專案名稱') ? 1 : 0;
-                let importCount = 0;
-                for (let i = startIdx; i < lines.length; i++) {
-                    const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
-                    if (parts.length >= 2) {
-                        const projectName = parts[0];
-                        const priority = parts[1] || '中';
-                        const stageName = parts[2] || '初始階段';
-                        
-                        const now = Date.now() + i;
-                        projects.push({
-                            id: now,
-                            name: projectName,
-                            priority: ['急', '中', '緩', '未開始'].includes(priority) ? priority : '中',
-                            baseDate: "",
-                            stages: [{
-                                name: stageName,
-                                triggerType: "start",
-                                time: "1",
-                                unit: "m",
-                                freqVal: "0",
-                                freqUnit: "永不",
-                                notified: false,
-                                content: ''
-                            }],
+                if (!lines.length) return alert('檔案內容為空');
+                const header = lines[0].split(',').map(h => h.replace(/(^"|"$)/g,'').trim());
+                const idxOf = (key) => header.indexOf(key);
+                const h = {
+                    projectId: idxOf("projectId"),
+                    projectName: idxOf("projectName"),
+                    priority: idxOf("priority"),
+                    baseDate: idxOf("baseDate"),
+                    isCompleted: idxOf("isCompleted"),
+                    currentStageIndex: idxOf("currentStageIndex"),
+                    stageIndex: idxOf("stageIndex"),
+                    stageName: idxOf("stageName"),
+                    triggerType: idxOf("triggerType"),
+                    time: idxOf("time"),
+                    unit: idxOf("unit"),
+                    freqVal: idxOf("freqVal"),
+                    freqUnit: idxOf("freqUnit"),
+                    notified: idxOf("notified"),
+                    content: idxOf("content")
+                };
+
+                const projectsMap = new Map();
+
+                const parseCsvLine = (line) => {
+                    const cells = [];
+                    let cur = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const ch = line[i];
+                        if (ch === '"' ) {
+                            if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+                            else inQuotes = !inQuotes;
+                        } else if (ch === ',' && !inQuotes) {
+                            cells.push(cur);
+                            cur = '';
+                        } else {
+                            cur += ch;
+                        }
+                    }
+                    cells.push(cur);
+                    return cells;
+                };
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cells = parseCsvLine(lines[i]).map(c => c.replace(/^\s+|\s+$/g,''));
+                    if (!cells.length || cells.every(c => c === '')) continue;
+                    const projectName = h.projectName >= 0 ? cells[h.projectName] : `專案${i}`;
+                    const projectKey = (h.projectId >= 0 && cells[h.projectId]) ? cells[h.projectId] : `${projectName}-${i}`;
+                    if (!projectsMap.has(projectKey)) {
+                        projectsMap.set(projectKey, {
+                            id: Date.now() + i,
+                            name: projectName || `專案${i}`,
+                            priority: ['急','中','緩','未開始'].includes(cells[h.priority]||'') ? cells[h.priority] : '中',
+                            baseDate: h.baseDate >=0 ? cells[h.baseDate] : "",
+                            stages: [],
                             currentStageIndex: 0,
-                            stageStartTime: now,
-                            isCompleted: false
+                            stageStartTime: Date.now(),
+                            isCompleted: h.isCompleted>=0 ? cells[h.isCompleted] === '1' : false
                         });
-                        importCount++;
+                    }
+                    const proj = projectsMap.get(projectKey);
+                    const stageObj = {
+                        name: h.stageName>=0 ? cells[h.stageName] : '初始階段',
+                        triggerType: h.triggerType>=0 ? cells[h.triggerType] : 'start',
+                        time: h.time>=0 ? cells[h.time] : '1',
+                        unit: h.unit>=0 ? cells[h.unit] : 'm',
+                        freqVal: h.freqVal>=0 ? cells[h.freqVal] : '0',
+                        freqUnit: h.freqUnit>=0 ? cells[h.freqUnit] : '永不',
+                        notified: h.notified>=0 ? cells[h.notified] === '1' : false,
+                        content: h.content>=0 ? cells[h.content].replace(/(^"|"$)/g,'') : ''
+                    };
+                    proj.stages.push(stageObj);
+                    if (h.currentStageIndex >=0 && cells[h.currentStageIndex]) {
+                        const idx = parseInt(cells[h.currentStageIndex]);
+                        if (!isNaN(idx)) proj.currentStageIndex = Math.min(Math.max(idx,0), proj.stages.length-1);
                     }
                 }
-                
+
+                projects = Array.from(projectsMap.values());
                 saveAllToStorage();
                 closeImport();
-                alert(`成功匯入 ${importCount} 個專案（CSV）。`);
+                alert(`成功匯入 ${projects.length} 個專案（CSV）。`);
             };
             
             reader.readAsText(file);
