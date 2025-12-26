@@ -134,6 +134,10 @@
             <summary class="cursor-pointer list-none text-gray-500 font-bold">▶ 查看已結案項目</summary>
             <div id="completed-list" class="mt-6 grid gap-4"></div>
         </details>
+        <details class="group mt-4 border-t border-gray-300 pt-4 opacity-60">
+            <summary class="cursor-pointer list-none text-gray-500 font-bold">▶ 已刪除（30天後自動清除）</summary>
+            <div id="deleted-list" class="mt-4 grid gap-3"></div>
+        </details>
     </div>
 
     <!-- Calendar Modal -->
@@ -246,8 +250,14 @@
             if (shouldRender) renderUI(true);
         }
 
+        function purgeDeletedExpired() {
+            const now = Date.now();
+            projects = projects.filter(p => !(p.isDeleted && p.deletedAt && (now - p.deletedAt > DELETE_EXPIRE_MS)));
+        }
+
         function updateRemindersOnly() {
             if (isEditing) return;
+            purgeDeletedExpired();
             const now = Date.now();
             const alertBox = document.getElementById('active-alerts');
             const summaryBox = document.getElementById('pending-summary');
@@ -344,10 +354,13 @@
 
         function renderUI(force = false) {
             if (isEditing && !force) return;
+            purgeDeletedExpired();
             updateRemindersOnly();
             const listBox = document.getElementById('project-list');
             const doneBox = document.getElementById('completed-list');
+            const delBox = document.getElementById('deleted-list');
             listBox.innerHTML = ''; doneBox.innerHTML = '';
+            if (delBox) delBox.innerHTML = '';
 
             const sorted = [...projects].sort((a,b) => {
                 const map = { '急':1, '中':2, '緩':3, '未開始':4 };
@@ -355,7 +368,18 @@
             });
 
             sorted.forEach(p => {
-                if (!p.isCompleted) {
+                if (p.isDeleted) {
+                    if (delBox) {
+                        delBox.innerHTML += `
+                        <div class="card p-4 flex justify-between items-center text-xs">
+                            <span class="font-semibold text-gray-600 truncate">${p.name} (已刪除)</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] text-gray-400">刪除時間：${p.deletedAt ? new Date(p.deletedAt).toLocaleString() : ''}</span>
+                                <button onclick="event.stopPropagation(); restoreProject(${p.id})" class="px-3 py-1 bg-white border border-gray-300 rounded-full text-[10px] font-semibold text-gray-700 hover:bg-gray-50 shadow-sm">復原</button>
+                            </div>
+                        </div>`;
+                    }
+                } else if (!p.isCompleted) {
                     listBox.innerHTML += `
                         <div id="card-${p.id}" class="card p-8" onclick="handleProjectCardClick(event, ${p.id})">
                             <div class="flex justify-between items-start mb-8">
@@ -444,6 +468,7 @@
         
         // 控制是否允許自動滾動（避免編輯時被移走）
         let autoScrollLocked = false;
+        const DELETE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
         function lockAutoScroll() { autoScrollLocked = true; }
         function unlockAutoScroll() { autoScrollLocked = false; }
 
@@ -730,7 +755,22 @@
             setTimeout(() => focusProject(now, 'active'), 100);
         }
 
-        function deleteProject(id) { if(confirm("確定刪除此專案？")) { projects = projects.filter(p => p.id !== id); saveAllToStorage(); } }
+        function deleteProject(id) { 
+            if(confirm("確定刪除此專案？（將移至已刪除，30天後自動清除）")) { 
+                const p = projects.find(x => x.id === id);
+                if (!p) return;
+                p.isDeleted = true;
+                p.deletedAt = Date.now();
+                saveAllToStorage(true);
+            } 
+        }
+        function restoreProject(id) {
+            const p = projects.find(x => x.id === id);
+            if (!p) return;
+            p.isDeleted = false;
+            p.deletedAt = null;
+            saveAllToStorage(true);
+        }
         function deleteStage(pId, sIdx) { syncDataFromDOM(); const p = projects.find(x => x.id === pId); if (p.stages.length <= 1) return alert("至少需保留一個階段"); p.stages.splice(sIdx, 1); if (p.currentStageIndex >= p.stages.length) p.currentStageIndex = p.stages.length - 1; updateSingleProjectUI(pId); triggerChange(); }
         function copyProject(id) { syncDataFromDOM(); const p = projects.find(x => x.id === id); const n = JSON.parse(JSON.stringify(p)); n.id = Date.now(); n.isCompleted = false; n.currentStageIndex = 0; n.stageStartTime = Date.now(); projects.push(n); saveAllToStorage(); }
         
@@ -738,7 +778,7 @@
             syncDataFromDOM(); 
             // 匯出為 Excel 友善的 CSV（每列代表一個階段）
             const headers = [
-                "projectId","projectName","priority","baseDate","isCompleted","currentStageIndex","stageIndex",
+                "projectId","projectName","priority","baseDate","isCompleted","isDeleted","deletedAt","currentStageIndex","stageIndex",
                 "stageName","triggerType","time","unit","freqVal","freqUnit","notified","content"
             ];
             const rows = [headers.join(",")];
@@ -756,6 +796,8 @@
                         esc(p.priority),
                         esc(p.baseDate || ""),
                         esc(p.isCompleted ? "1" : "0"),
+                        esc(p.isDeleted ? "1" : "0"),
+                        esc(p.deletedAt || ""),
                         esc(p.currentStageIndex),
                         esc(idx),
                         esc(s.name),
@@ -1008,6 +1050,8 @@
                     priority: idxOf("priority"),
                     baseDate: idxOf("baseDate"),
                     isCompleted: idxOf("isCompleted"),
+                    isDeleted: idxOf("isDeleted"),
+                    deletedAt: idxOf("deletedAt"),
                     currentStageIndex: idxOf("currentStageIndex"),
                     stageIndex: idxOf("stageIndex"),
                     stageName: idxOf("stageName"),
@@ -1056,7 +1100,9 @@
                             stages: [],
                             currentStageIndex: 0,
                             stageStartTime: Date.now(),
-                            isCompleted: h.isCompleted>=0 ? cells[h.isCompleted] === '1' : false
+                            isCompleted: h.isCompleted>=0 ? cells[h.isCompleted] === '1' : false,
+                            isDeleted: h.isDeleted>=0 ? cells[h.isDeleted] === '1' : false,
+                            deletedAt: h.deletedAt>=0 ? Number(cells[h.deletedAt]) || Date.now() : null
                         });
                     }
                     const proj = projectsMap.get(projectKey);
