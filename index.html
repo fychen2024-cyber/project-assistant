@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Assistant Pro v35 (Fix Link)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap');
+        body { font-family: 'SF Pro Display', -apple-system, sans-serif; background-color: #F2F2F7; color: #1C1C1E; scroll-behavior: smooth; }
+        .apple-blur { backdrop-filter: blur(30px); background-color: rgba(255, 255, 255, 0.85); }
+        .card { background: white; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); }
+        .inline-input { background: transparent; border-bottom: 1px solid transparent; transition: all 0.2s; }
+        .inline-input:focus { border-bottom-color: #0071E3; background: rgba(0,113,227,0.05); outline: none; }
+        
+        .custom-scroll { display: flex; gap: 1.5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 20px; scroll-behavior: smooth; }
+        .custom-scroll::-webkit-scrollbar { height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+
+        .priority-急 { color: #FF3B30 !important; border: 1px solid #FF3B30 !important; }
+        .priority-中 { color: #FF9500 !important; border: 1px solid #FF9500 !important; }
+        .priority-緩 { color: #34C759 !important; border: 1px solid #34C759 !important; }
+        .priority-未開始 { color: #6B7280 !important; border: 1px solid #6B7280 !important; }
+        
+        #floating-save { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .date-input { border: 1px solid #E5E5EA; border-radius: 8px; padding: 2px 8px; font-size: 11px; margin-top: 4px; }
+        
+        .active-stage { background-color: #eff6ff !important; border-color: #bfdbfe !important; box-shadow: 0 0 0 4px #eff6ff !important; opacity: 1 !important; }
+
+        /* Calendar styles */
+        .calendar-day { 
+            min-height: 100px; 
+            border: 1px solid #E5E5EA; 
+            padding: 8px; 
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .calendar-day:hover { background-color: #F9F9F9; }
+        .calendar-day.other-month { opacity: 0.3; }
+        .calendar-day.today { background-color: #E3F2FD; border-color: #0071E3; }
+        .calendar-event { 
+            font-size: 10px; 
+            padding: 2px 6px; 
+            margin-top: 4px; 
+            border-radius: 6px; 
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Modal styles */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 30px; border-radius: 24px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: #000; }
+
+        /* 簡潔的文字編輯器樣式 */
+        .stage-content-editor {
+            min-height: 60px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #E5E5EA;
+            border-radius: 8px;
+            padding: 8px;
+            background: #FAFAFA;
+            font-size: 12px;
+            line-height: 1.8;
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .stage-content-editor:focus {
+            outline: none;
+            border-color: #0071E3;
+            background: white;
+        }
+        .stage-content-editor:empty:before {
+            content: '輸入內容... ([] 空格 = 勾選框)';
+            color: #999;
+        }
+        
+        /* Checkbox 樣式 */
+        .stage-content-editor input[type="checkbox"] {
+            margin-right: 6px;
+            margin-left: 2px;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        
+        .stage-content-editor .todo-line {
+            display: block;
+            margin: 2px 0;
+        }
+
+        .tab-button { padding: 10px 20px; border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab-button.active { border-bottom-color: #0071E3; color: #0071E3; font-weight: 600; }
+
+        /* Signature footer styling */
+        #signature-footer {
+            color: #6B7280;
+            letter-spacing: 0.02em;
+        }
+    </style>
+</head>
+<body class="pb-40">
+
+    <div id="notif-center" class="fixed top-0 left-0 right-0 z-[100] apple-blur border-b border-gray-200">
+        <div class="max-w-5xl mx-auto p-4">
+            <h2 class="text-[10px] font-bold text-gray-400 mb-2 tracking-widest px-1">即時任務提醒</h2>
+            <div id="active-alerts" class="space-y-2 max-h-[120px] overflow-y-auto no-scrollbar pr-2"></div>
+        </div>
+    </div>
+
+    <div id="floating-save">
+        <button onclick="saveAllToStorage()" class="bg-[#34C759] text-white px-12 py-4 rounded-full font-bold shadow-2xl hover:scale-105 transition-all flex items-center gap-2">
+            <span>💾 內容已變動：點此儲存專案</span>
+        </button>
+    </div>
+
+    <div class="max-w-5xl mx-auto mt-[160px] px-6">
+        <div class="flex justify-between items-end mb-10">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight">專案助手</h1>
+                <p class="text-gray-400 text-sm mt-1">本來無一物，何處惹塵埃。</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="showCalendar()" class="text-sm font-semibold text-purple-600 px-4 py-2 hover:bg-purple-50 rounded-xl transition">📅 行事曆</button>
+                <button onclick="importFromCSV()" class="text-sm font-semibold text-green-600 px-4 py-2 hover:bg-green-50 rounded-xl transition">📥 匯入</button>
+                <button onclick="exportToCSV()" class="text-sm font-semibold text-blue-600 px-4 py-2 hover:bg-blue-50 rounded-xl transition">📤 匯出報表</button>
+                <button onclick="addNewProject()" class="bg-[#0071E3] text-white px-8 py-3 rounded-full text-sm font-bold shadow-lg shadow-blue-500/20">+ 新增專案</button>
+            </div>
+        </div>
+
+        <section id="pending-summary" class="grid grid-cols-1 gap-4 mb-12"></section>
+        <div id="project-list" class="space-y-12"></div>
+
+        <details class="group mt-20 border-t border-gray-300 pt-8 opacity-50">
+            <summary class="cursor-pointer list-none text-gray-500 font-bold">▶ 查看已結案項目</summary>
+            <div id="completed-list" class="mt-6 grid gap-4"></div>
+        </details>
+        <details class="group mt-4 border-t border-gray-300 pt-4 opacity-60">
+            <summary class="cursor-pointer list-none text-gray-500 font-bold">▶ 已刪除（30天後自動清除）</summary>
+            <div id="deleted-list" class="mt-4 grid gap-3"></div>
+        </details>
+    </div>
+
+    <footer id="signature-footer" class="text-center text-xs text-gray-500 mt-12 pb-6 select-none">
+        <span id="signature-text">by 逍遙楓@2025</span>
+    </footer>
+
+    <div id="calendar-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCalendar()">&times;</span>
+            <h2 class="text-2xl font-bold mb-6">專案行事曆</h2>
+            
+            <div class="flex gap-2 mb-6 border-b">
+                <button class="tab-button active" onclick="switchCalendarView('month')" id="tab-month">月視圖</button>
+                <button class="tab-button" onclick="switchCalendarView('week')" id="tab-week">週視圖</button>
+                <button class="tab-button" onclick="switchCalendarView('day')" id="tab-day">日視圖</button>
+            </div>
+
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="navigateCalendar(-1)" class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">◀ 上一個</button>
+                <h3 id="calendar-title" class="text-xl font-bold"></h3>
+                <button onclick="navigateCalendar(1)" class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">下一個 ▶</button>
+            </div>
+
+            <div id="calendar-grid"></div>
+        </div>
+    </div>
+
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeImport()">&times;</span>
+            <h2 class="text-2xl font-bold mb-6">匯入專案資料</h2>
+            <p class="text-sm text-gray-600 mb-4">請選擇CSV檔案（格式：專案名稱,優先度,階段名稱）</p>
+            <input type="file" id="import-file" accept=".csv" class="mb-4 p-2 border rounded-lg w-full">
+            <button onclick="processImport()" class="bg-[#0071E3] text-white px-6 py-3 rounded-xl font-bold w-full">開始匯入</button>
+        </div>
+    </div>
+
+    <script>
+        const SIGNATURE_PASSWORD = 'Fy000000++';
+        const SIGNATURE_TEXT = 'by 逍遙楓@2025';
+
+        let projects = JSON.parse(localStorage.getItem('apple_pm_v33')) || [];
+        let isEditing = false;
+        let currentCalendarView = 'month';
+        let currentCalendarDate = new Date();
+        let signatureUnlocked = false;
+        let signatureObserver;
+
+        setInterval(() => { updateRemindersOnly(); }, 1000);
+
+        function ensureSignatureFooter() {
+            let footer = document.getElementById('signature-footer');
+            if (!footer) {
+                footer = document.createElement('footer');
+                footer.id = 'signature-footer';
+                footer.className = 'text-center text-xs text-gray-500 mt-12 pb-6 select-none';
+                document.body.appendChild(footer);
+            }
+
+            let text = document.getElementById('signature-text');
+            if (!text) {
+                text = document.createElement('span');
+                text.id = 'signature-text';
+                footer.appendChild(text);
+            }
+            return { footer, text };
+        }
+
+        function restoreSignature() {
+            const { text } = ensureSignatureFooter();
+            text.innerText = SIGNATURE_TEXT;
+        }
+
+        function requestSignaturePassword() {
+            const input = prompt('請輸入密碼以修改或移除標記：');
+            return input === SIGNATURE_PASSWORD;
+        }
+
+        // --- 連結修復部分 START ---
+        function openFolderLink(rawLink, event) {
+            if (event) event.stopPropagation();
+            if (!rawLink) return;
+            let url = rawLink.trim();
+            // 移除可能的前後引號
+            url = url.replace(/^["']|["']$/g, '');
+            if (!url) return;
+
+            // 判斷是否為網頁連結
+            const isWeb = /^https?:\/\//i.test(url) || /^www\./i.test(url);
+
+            if (isWeb) {
+                // 自動補齊 https
+                if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+                // 強制在新分頁開啟，避免覆蓋當前頁面
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } else {
+                // 本地路徑處理：複製到剪貼簿 + 提示
+                // 將反斜線轉為正斜線 (視需求，但通常 Windows 剪貼簿皆可接受)
+                const displayUrl = url; 
+                
+                navigator.clipboard.writeText(url).then(() => {
+                    alert(`由於瀏覽器安全限制，本地路徑無法直接開啟。\n\n路徑已成功複製到剪貼簿：\n${url}\n\n請開啟檔案總管 (Win+E) 並貼上。`);
+                }).catch(err => {
+                    console.error('複製失敗', err);
+                    prompt('瀏覽器阻擋自動複製，請手動複製下方路徑：', url);
+                });
+            }
+        }
+        // --- 連結修復部分 END ---
+
+        function enforceSignatureIntegrity() {
+            if (signatureUnlocked) return;
+            const footer = document.getElementById('signature-footer');
+            const text = document.getElementById('signature-text');
+            const currentText = text?.innerText ?? '';
+            const intact = footer && text && currentText === SIGNATURE_TEXT;
+            if (intact) return;
+
+            signatureObserver?.disconnect();
+            const allowed = requestSignaturePassword();
+            if (!allowed) {
+                restoreSignature();
+            } else {
+                signatureUnlocked = true;
+            }
+            startSignatureObserver();
+        }
+
+        function startSignatureObserver() {
+            if (!signatureObserver) {
+                signatureObserver = new MutationObserver(enforceSignatureIntegrity);
+            }
+            signatureObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+        }
+
+        function initSignatureGuard() {
+            restoreSignature();
+            startSignatureObserver();
+        }
+
+        function triggerChange() {
+            isEditing = true;
+            document.getElementById('floating-save').style.display = 'block';
+        }
+
+        function updatePriorityStyle(el) {
+            el.classList.remove('priority-急', 'priority-中', 'priority-緩', 'priority-未開始');
+            el.classList.add(`priority-${el.value}`);
+            triggerChange();
+        }
+
+        function clearDefaultText(el) {
+            const defaults = ["新專案主題", "初始階段", "新階段步驟", "新增階段步驟"];
+            if (defaults.includes(el.innerText.trim())) el.innerText = "";
+            triggerChange();
+        }
+
+        function syncDataFromDOM() {
+            projects.forEach(p => {
+                const card = document.getElementById(`card-${p.id}`);
+                if (!card) return;
+                p.name = card.querySelector('.p-name-input').innerText;
+                p.priority = card.querySelector('.p-priority-select').value;
+                p.baseDate = card.querySelector('.p-base-date').value;
+                const linkInput = card.querySelector('.p-folder-link');
+                p.folderLink = linkInput ? linkInput.value : (p.folderLink || '');
+                const stageEls = card.querySelectorAll('.stage-block');
+                p.stages = Array.from(stageEls).map((el, idx) => {
+                    const existingStage = p.stages[idx] || {};
+                    const contentEditor = el.querySelector('.stage-content-editor');
+                    const contentHtml = getEditorHtmlWithChecks(contentEditor) || existingStage.content || '';
+                    return {
+                        name: el.querySelector('.s-name-input').innerText,
+                        triggerType: el.querySelector('.s-trigger-type').value,
+                        time: el.querySelector('.s-time-input').value,
+                        unit: el.querySelector('.s-unit-select').value,
+                        freqVal: el.querySelector('.s-freq-val').value,
+                        freqUnit: el.querySelector('.s-freq-unit').value,
+                        notified: existingStage.notified || false,
+                        content: contentHtml
+                    };
+                });
+            });
+        }
+
+        function createStageTemplate(name = "新增階段步驟") {
+            return { name, triggerType: "start", time: "1", unit: "m", freqVal: "0", freqUnit: "永遠", notified: false, content: '' };
+        }
+
+        // 取出編輯器內容並保留 checkbox 的勾選狀態
+        function getEditorHtmlWithChecks(editor) {
+            if (!editor) return '';
+            const clone = editor.cloneNode(true);
+            clone.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                if (cb.checked) {
+                    cb.setAttribute('checked', 'checked');
+                } else {
+                    cb.removeAttribute('checked');
+                }
+            });
+            return clone.innerHTML;
+        }
+
+        function saveAllToStorage(shouldRender = true) {
+            syncDataFromDOM();
+            localStorage.setItem('apple_pm_v33', JSON.stringify(projects));
+            isEditing = false;
+            document.getElementById('floating-save').style.display = 'none';
+            if (shouldRender) renderUI(true);
+        }
+
+        function purgeDeletedExpired() {
+            const now = Date.now();
+            projects = projects.filter(p => !(p.isDeleted && p.deletedAt && (now - p.deletedAt > DELETE_EXPIRE_MS)));
+        }
+
+        function updateRemindersOnly() {
+            if (isEditing) return;
+            purgeDeletedExpired();
+            const now = Date.now();
+            const alertBox = document.getElementById('active-alerts');
+            const summaryBox = document.getElementById('pending-summary');
+            let alertHtml = '';
+            let summaryHtml = '';
+            let summaryActive = '';
+            let summaryNotStarted = '';
+            // 保留未開始折疊區塊的展開狀態
+            const notStartedWasOpen = document.getElementById('not-started-details')?.open;
+
+            const sorted = [...projects].sort((a,b) => {
+                const map = { '急':1, '中':2, '緩':3, '未開始':4 };
+                return (map[a.priority] || 5) - (map[b.priority] || 5);
+            });
+
+            sorted.forEach(p => {
+                if (p.isCompleted || p.isDeleted) return;
+                const stage = p.stages[p.currentStageIndex];
+                const curIdx = p.currentStageIndex + 1;
+                const total = p.stages.length;
+                const isLast = p.currentStageIndex === total - 1;
+
+                let targetTime = 0;
+                if (stage.triggerType === 'start') {
+                    let offset = (parseInt(stage.time) || 0) * 60000;
+                    if (stage.unit === 'h') offset *= 60; if (stage.unit === 'd') offset *= 1440;
+                    targetTime = p.stageStartTime + offset;
+                } else if (stage.triggerType === 'base' && p.baseDate) {
+                    let baseTs = new Date(p.baseDate).getTime();
+                    let offset = (parseInt(stage.time) || 0);
+                    if (stage.unit === 'd') offset *= 86400000;
+                    else if (stage.unit === 'h') offset *= 3600000;
+                    else if (stage.unit === 'm') offset *= 60000;
+                    // 正數 = 基準日後，負數 = 基準日前
+                    targetTime = baseTs + offset;
+                } else if (stage.triggerType === 'none') {
+                    targetTime = 0;
+                }
+
+                if (targetTime > 0 && now >= targetTime) {
+                    const color = p.priority === '急' ? '#FF3B30' : p.priority === '中' ? '#FF9500' : p.priority === '緩' ? '#34C759' : '#6B7280';
+                    alertHtml += `<div onclick="focusProject(${p.id}, 'active')" class="cursor-pointer bg-white border-l-4 p-3 rounded-xl flex items-center shadow-sm" style="border-left-color: ${color}"><span class="text-xs font-bold" style="color: ${color}">【${p.priority}】${p.name}：${stage.name} (第 ${curIdx}/${total} 階段)</span></div>`;
+                }
+
+                const summaryCard = `
+                    <div class="card p-5 flex justify-between items-center border-l-8 ${p.priority === '急' ? 'border-red-500' : p.priority === '中' ? 'border-orange-500' : p.priority === '緩' ? 'border-green-500' : 'border-gray-400'}">
+                        <div class="truncate mr-4 font-bold text-sm cursor-pointer" onclick="focusProject(${p.id}, 'active')">${p.name}：${stage.name} (${curIdx}/${total})</div>
+                        <div class="flex gap-2">
+                            ${p.currentStageIndex > 0 ? `<button onclick="prevStage(${p.id})" class="bg-gray-200 text-gray-600 px-3 py-2 rounded-full text-[10px] font-bold shadow-sm">↩ 回退</button>` : ''}
+                            <button onclick="nextStage(${p.id})" class="${isLast?'bg-[#34C759]':'bg-[#0071E3]'} text-white px-5 py-2 rounded-full text-[10px] font-bold shadow-md whitespace-nowrap">${isLast?'完成專案':'下一階段'}</button>
+                        </div>
+                    </div>`;
+
+                if (p.isDeleted) {
+                    // skip deleted projects from all bulletin sections
+                } else if (p.priority === '未開始') {
+                    summaryNotStarted += summaryCard;
+                } else {
+                    summaryActive += summaryCard;
+                }
+            });
+            if (summaryNotStarted) {
+                const openAttr = notStartedWasOpen ? 'open' : '';
+                summaryHtml = summaryActive + `
+                    <details id="not-started-details" class="mt-3 border border-gray-200 rounded-xl bg-white/60" ${openAttr}>
+                        <summary class="px-4 py-3 cursor-pointer text-sm font-semibold text-gray-600">未開始的專案（點此展開）</summary>
+                        <div class="p-3 space-y-2">
+                            ${summaryNotStarted}
+                        </div>
+                    </details>`;
+            } else {
+                summaryHtml = summaryActive;
+            }
+            alertBox.innerHTML = alertHtml;
+            summaryBox.innerHTML = summaryHtml;
+        }
+
+        // 使用原始的 focusProject - 完全不改動
+        function focusProject(pId, targetType) {
+            const card = document.getElementById(`card-${pId}`);
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            let targetEl;
+            if (targetType === 'new') {
+                const stages = card.querySelectorAll('.stage-block');
+                targetEl = stages[stages.length - 1];
+            } else {
+                targetEl = card.querySelector('.active-stage');
+            }
+
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+
+        function renderUI(force = false) {
+            if (isEditing && !force) return;
+            purgeDeletedExpired();
+            updateRemindersOnly();
+            const listBox = document.getElementById('project-list');
+            const doneBox = document.getElementById('completed-list');
+            const delBox = document.getElementById('deleted-list');
+            listBox.innerHTML = ''; doneBox.innerHTML = '';
+            if (delBox) delBox.innerHTML = '';
+
+            const sorted = [...projects].sort((a,b) => {
+                const map = { '急':1, '中':2, '緩':3, '未開始':4 };
+                return (map[a.priority] || 5) - (map[b.priority] || 5);
+            });
+
+            sorted.forEach(p => {
+                if (p.isDeleted) {
+                    if (delBox) {
+                        delBox.innerHTML += `
+                        <div class="card p-4 flex justify-between items-center text-xs">
+                            <span class="font-semibold text-gray-600 truncate">${p.name} (已刪除)</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] text-gray-400">刪除時間：${p.deletedAt ? new Date(p.deletedAt).toLocaleString() : ''}</span>
+                                <button onclick="event.stopPropagation(); restoreProject(${p.id})" class="px-3 py-1 bg-white border border-gray-300 rounded-full text-[10px] font-semibold text-gray-700 hover:bg-gray-50 shadow-sm">復原</button>
+                            </div>
+                        </div>`;
+                    }
+                } else if (!p.isCompleted) {
+                    listBox.innerHTML += `
+                        <div id="card-${p.id}" class="card p-8" onclick="handleProjectCardClick(event, ${p.id})">
+                            <div class="flex justify-between items-start mb-8">
+                                <div class="flex-1">
+                                    <select onfocus="triggerChange()" onchange="updatePriorityStyle(this)" class="p-priority-select text-[10px] font-bold border rounded-lg px-2 py-1 mb-2 priority-${p.priority}">
+                                        <option value="急" ${p.priority==='急'?'selected':''}>急優先</option>
+                                        <option value="中" ${p.priority==='中'?'selected':''}>中優先</option>
+                                        <option value="緩" ${p.priority==='緩'?'selected':''}>緩優先</option>
+                                        <option value="未開始" ${p.priority==='未開始'?'selected':''}>未開始</option>
+                                    </select>
+                                    <h3 contenteditable="true" onfocus="isEditing=true; clearDefaultText(this)" oninput="triggerChange()" class="p-name-input text-2xl font-bold inline-input w-full">${p.name}</h3>
+                                    <div class="flex items-center gap-2 text-[10px] text-gray-400 font-semibold">
+                                        基準發生日: <input type="date" class="p-base-date date-input" value="${p.baseDate || ''}" onchange="triggerChange()">
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[10px] text-gray-500 font-semibold mt-1 flex-wrap">
+                                        相關連結:
+                                        <input type="text" class="p-folder-link flex-1 min-w-[180px] border rounded px-2 py-1 text-[11px] text-gray-700" placeholder="貼上資料夾/檔案路徑或 URL" value="${p.folderLink || ''}" oninput="triggerChange()">
+                                        ${p.folderLink ? `<button type="button" data-link="${(p.folderLink || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="openFolderLink(this.dataset.link, event)" class="text-blue-500 font-bold whitespace-nowrap">開啟</button>` : ''}
+                                    </div>
+                                </div>
+                                <div class="flex gap-4">
+                                    <button onclick="event.stopPropagation(); copyProject(${p.id})" class="text-xs text-blue-500 font-bold">複製</button>
+                                    <button onclick="event.stopPropagation(); deleteProject(${p.id})" class="text-xs text-red-200">刪除</button>
+                                </div>
+                            </div>
+                            <div class="custom-scroll items-stretch" id="scroll-${p.id}">
+                                ${p.stages.map((s, idx) => generateStageHtml(p, s, idx)).join('')}
+                                <div id="add-btn-${p.id}" onclick="event.stopPropagation(); addStageToProject(${p.id})" class="min-w-[60px] h-[200px] my-auto cursor-pointer bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all text-2xl font-light">＋</div>
+                            </div>
+                        </div>`;
+                } else {
+                    doneBox.innerHTML += `
+                        <div class="card p-4 flex justify-between items-center text-xs">
+                            <span class="font-semibold text-gray-600">${p.name} (結案)</span>
+                            <div class="flex gap-4">
+                                <button onclick="resumeProject(${p.id})" class="text-green-600 font-bold">繼續編輯</button>
+                                <button onclick="copyProject(${p.id})" class="text-blue-500 font-bold">重啟</button>
+                                <button onclick="deleteProject(${p.id})" class="text-red-500 font-bold">刪除資料</button>
+                            </div>
+                        </div>`;
+                }
+            });
+            
+            // 渲染完成後，立即將所有專案的滾動容器定位到當前階段（不使用動畫）
+            setTimeout(() => {
+                sorted.forEach(p => {
+                    if (!p.isCompleted) {
+                        scrollToCurrentStageInstant(p.id);
+                    }
+                });
+            }, 0);
+        }
+        
+        // 立即滾動到當前階段（不使用動畫）
+        function scrollToCurrentStageInstant(projectId) {
+            const scrollContainer = document.getElementById(`scroll-${projectId}`);
+            if (!scrollContainer) return;
+            
+            const activeStage = scrollContainer.querySelector('.active-stage');
+            if (!activeStage) return;
+            
+            // 直接瞬移置中，避免任何平滑動畫影響
+            scrollStageIntoView(scrollContainer, activeStage, 'auto');
+        }
+
+        // 自訂平滑動畫（避免瀏覽器預設不一致）
+        const scrollAnimations = new Map();
+        function smoothScrollTo(container, target, duration = 420) {
+            if (!container) return;
+            if (scrollAnimations.has(container)) {
+                cancelAnimationFrame(scrollAnimations.get(container));
+            }
+            const start = container.scrollLeft;
+            const change = target - start;
+            const startTime = performance.now();
+
+            function step(now) {
+                const elapsed = Math.min(1, (now - startTime) / duration);
+                // easeOutQuad
+                const eased = 1 - Math.pow(1 - elapsed, 2);
+                container.scrollLeft = start + change * eased;
+                if (elapsed < 1) {
+                    const id = requestAnimationFrame(step);
+                    scrollAnimations.set(container, id);
+                } else {
+                    scrollAnimations.delete(container);
+                }
+            }
+            const id = requestAnimationFrame(step);
+            scrollAnimations.set(container, id);
+        }
+        
+        // 控制是否允許自動滾動（避免編輯時被移走）
+        let autoScrollLocked = false;
+        const DELETE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
+        function lockAutoScroll() { autoScrollLocked = true; }
+        function unlockAutoScroll() { autoScrollLocked = false; }
+
+        // 計算並滾動至目標階段（可選擇平滑或瞬移）
+        function scrollStageIntoView(container, stageEl, behavior = 'smooth', restoreLeft = null, force = false) {
+            if (!container || !stageEl) return;
+            if (autoScrollLocked && !force) return;
+
+            // 暫時關閉任何平滑設定，先回到前一個位置，避免先閃到最左
+            const originalBehavior = container.style.scrollBehavior;
+            if (restoreLeft !== null) {
+                container.style.scrollBehavior = 'auto';
+                container.scrollLeft = restoreLeft;
+            }
+
+            const containerWidth = container.clientWidth;
+            const targetScroll = stageEl.offsetLeft - (containerWidth / 2) + (stageEl.offsetWidth / 2);
+            const finalTarget = Math.max(0, targetScroll);
+
+            if (behavior === 'smooth') {
+                smoothScrollTo(container, finalTarget);
+            } else {
+                container.scrollLeft = finalTarget;
+            }
+
+            // 還原原本的 scroll-behavior 設定
+            if (originalBehavior) {
+                container.style.scrollBehavior = originalBehavior;
+            } else {
+                container.style.removeProperty('scroll-behavior');
+            }
+        }
+        
+        // 處理專案卡片點擊事件
+        function handleProjectCardClick(event, projectId) {
+            // 如果點擊的是可編輯區域或按鈕，不執行置中
+            const target = event.target;
+            if (target.contentEditable === 'true' || 
+                target.tagName === 'BUTTON' || 
+                target.tagName === 'SELECT' ||
+                target.tagName === 'INPUT' ||
+                target.closest('button') ||
+                target.closest('.stage-content-editor')) {
+                lockAutoScroll();
+                return;
+            }
+            
+            // 將專案卡片置中
+            const card = document.getElementById(`card-${projectId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            // 將階段滾動到當前階段（使用平滑滾動）
+            setTimeout(() => {
+                const scrollContainer = document.getElementById(`scroll-${projectId}`);
+                if (!scrollContainer) return;
+                
+                const activeStage = scrollContainer.querySelector('.active-stage');
+                if (!activeStage) return;
+
+                scrollStageIntoView(scrollContainer, activeStage, 'smooth', null, true);
+            }, 100);
+        }
+        
+        // 處理 [] 空格 轉換為 checkbox
+        function handleCheckboxInput(event) {
+            const editor = event.target;
+            
+            // 獲取編輯器的純文字內容
+            const textContent = editor.textContent || editor.innerText || '';
+            
+            // 檢查是否以 "[] " 結尾（包含空格）
+            if (textContent.endsWith('[] ')) {
+                // 獲取當前的 HTML 內容
+                const currentHTML = getEditorHtmlWithChecks(editor); // 保留既有 checkbox 的勾選狀態
+                
+                // 找到最後的 [] 位置
+                const lastBracketIndex = currentHTML.lastIndexOf(']');
+                const secondLastBracketIndex = currentHTML.lastIndexOf('[', lastBracketIndex - 1);
+                
+                if (lastBracketIndex > -1 && secondLastBracketIndex > -1) {
+                    // 創建 checkbox HTML
+                    const checkboxHTML = '<input type="checkbox" onchange="triggerChange()" style="margin-right:6px;margin-left:2px;cursor:pointer;vertical-align:middle;">';
+                    
+                    // 替換 [] 和後面的空格
+                    let newHTML = currentHTML.substring(0, secondLastBracketIndex) + 
+                                  checkboxHTML + ' ' +
+                                  currentHTML.substring(lastBracketIndex + 1).replace(/^\s+/, '');
+                    
+                    // 更新編輯器內容
+                    editor.innerHTML = newHTML;
+                    
+                    // 設置游標到最後
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    
+                    // 找到最後一個文字節點或編輯器末尾
+                    const lastNode = editor.lastChild;
+                    if (lastNode) {
+                        if (lastNode.nodeType === Node.TEXT_NODE) {
+                            range.setStart(lastNode, lastNode.textContent.length);
+                        } else {
+                            range.setStartAfter(lastNode);
+                        }
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                    
+                    // 不需要再呼叫 triggerChange，因為 oninput 已經會呼叫
+                }
+            }
+        }
+        
+        // 處理 checkbox 點擊
+        function handleCheckboxClick(event) {
+            if (event.target.type === 'checkbox') {
+                triggerChange();
+            }
+        }
+
+        function generateStageHtml(p, s, idx) {
+            const isCur = idx === p.currentStageIndex;
+            // 使用 innerHTML 來保留 checkbox 等 HTML 元素
+            const contentHtml = s.content || '';
+            return `
+                <div class="stage-block ${isCur ? 'active-stage' : ''} min-w-[280px] p-5 rounded-3xl border relative flex flex-col ${isCur ? '' : 'bg-white border-gray-100 opacity-60'} transition-all duration-300">
+                    <button onclick="event.stopPropagation(); deleteStage(${p.id}, ${idx})" class="absolute top-3 right-3 text-gray-300 hover:text-red-500">×</button>
+                    <div class="text-[9px] font-bold text-gray-400 mb-2">第 ${idx+1} 階段 (共 ${p.stages.length})</div>
+                    <div contenteditable="true" onfocus="isEditing=true; clearDefaultText(this)" oninput="triggerChange()" class="s-name-input text-sm font-bold inline-input mb-4">${s.name}</div>
+                    
+                    <div contenteditable="true" 
+                         class="stage-content-editor" 
+                         data-project-id="${p.id}"
+                         data-stage-idx="${idx}"
+                         oninput="handleCheckboxInput(event); triggerChange()"
+                         onclick="handleCheckboxClick(event)">${contentHtml}</div>
+
+                    <div class="space-y-3 mt-auto pt-4 text-[10px] text-gray-500 border-t border-gray-100">
+                        <div class="flex flex-col gap-1">
+                            <select onchange="triggerChange()" class="s-trigger-type border rounded p-1">
+                                <option value="start" ${s.triggerType==='start'?'selected':''}>啟動後提醒</option>
+                                <option value="base" ${s.triggerType==='base'?'selected':''}>基準日前後提醒</option>
+                                <option value="none" ${s.triggerType==='none'?'selected':''}>不提醒</option>
+                            </select>
+                    <div class="flex items-center gap-1">
+                        <span>時間:</span>
+                        <input type="number" oninput="triggerChange()" value="${s.time}" class="s-time-input w-10 border rounded text-center">
+                            <select onchange="triggerChange()" class="s-unit-select border rounded"><option value="m" ${s.unit==='m'?'selected':''}>分</option><option value="h" ${s.unit==='h'?'selected':''}>時</option><option value="d" ${s.unit==='d'?'selected':''}>天</option></select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1"><span>頻率：每</span><input type="number" oninput="triggerChange()" value="${s.freqVal}" class="s-freq-val w-8 border rounded text-center"><select onchange="triggerChange()" class="s-freq-unit border rounded"><option value="永不" ${s.freqUnit==='永不'?'selected':''}>永不</option><option value="小時" ${s.freqUnit==='小時'?'selected':''}>小時</option><option value="日" ${s.freqUnit==='日'?'selected':''}>日</option></select></div>
+                </div>
+                <div class="mt-5 space-y-2">
+                    ${isCur ? `
+                        <div class="flex gap-2">
+                            ${idx > 0 ? `<button onclick="event.stopPropagation(); prevStage(${p.id})" class="flex-1 bg-gray-200 text-gray-600 py-3 rounded-2xl text-[10px] font-bold shadow-sm">↩ 回退</button>` : ''}
+                            <button onclick="event.stopPropagation(); nextStage(${p.id})" class="flex-[2] ${idx === p.stages.length - 1 ? 'bg-[#34C759]' : 'bg-[#0071E3]'} text-white py-3 rounded-2xl text-[10px] font-bold shadow-lg">${idx === p.stages.length - 1 ? '完成專案' : '下一階段'}</button>
+                        </div>
+                        <div class="flex gap-2 text-[10px]">
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'before')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在前插入</button>
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'after')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在後插入</button>
+                        </div>` : `
+                        <div class="flex gap-2 text-[10px]">
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'before')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在前插入</button>
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'after')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在後插入</button>
+                        </div>`}
+                </div>
+            </div>`;
+    }
+
+        function nextStage(id) {
+            syncDataFromDOM();
+            const p = projects.find(x => x.id === id);
+            if (p.currentStageIndex < p.stages.length - 1) {
+                // Preserve scroll position to prevent a jump to the far left
+                const scrollContainer = document.getElementById(`scroll-${id}`);
+                const currentScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+
+                p.currentStageIndex++; p.stageStartTime = Date.now();
+                updateSingleProjectUI(id);
+                saveAllToStorage(false);
+                updateRemindersOnly();
+
+                requestAnimationFrame(() => {
+                    const container = document.getElementById(`scroll-${id}`);
+                    if (!container) return;
+                    const activeStage = container.querySelector('.active-stage');
+                    if (!activeStage) return;
+                    scrollStageIntoView(container, activeStage, 'smooth', currentScrollLeft, true);
+                    unlockAutoScroll();
+                });
+            } else if(confirm("確認完成並關閉專案嗎?")) { 
+                p.isCompleted = true; 
+                saveAllToStorage(false);
+                updateRemindersOnly();
+                renderUI(true); 
+            }
+        }
+
+        function prevStage(id) {
+            syncDataFromDOM();
+            const p = projects.find(x => x.id === id);
+            if (p.currentStageIndex > 0) {
+                // Preserve scroll position to prevent a jump to the far left
+                const scrollContainer = document.getElementById(`scroll-${id}`);
+                const currentScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+
+                p.currentStageIndex--; p.stageStartTime = Date.now();
+                updateSingleProjectUI(id);
+                saveAllToStorage(false);
+                updateRemindersOnly();
+
+                requestAnimationFrame(() => {
+                    const container = document.getElementById(`scroll-${id}`);
+                    if (!container) return;
+                    const activeStage = container.querySelector('.active-stage');
+                    if (!activeStage) return;
+                    scrollStageIntoView(container, activeStage, 'smooth', currentScrollLeft, true);
+                    unlockAutoScroll();
+                });
+            }
+        }
+
+        function updateSingleProjectUI(id) {
+            const p = projects.find(x => x.id === id);
+            const scrollContainer = document.getElementById(`scroll-${id}`);
+            if (!scrollContainer) return;
+            scrollContainer.innerHTML = p.stages.map((s, idx) => generateStageHtml(p, s, idx)).join('') + `<div id="add-btn-${p.id}" onclick="event.stopPropagation(); addStageToProject(${p.id})" class="min-w-[60px] h-[200px] my-auto cursor-pointer bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all text-2xl font-light">＋</div>`;
+        }
+
+        function addStageToProject(pId) {
+            syncDataFromDOM();
+            const p = projects.find(x => x.id === pId);
+
+            // Preserve scroll position to prevent a jump to the far left
+            const scrollContainer = document.getElementById(`scroll-${pId}`);
+            const currentScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+
+            p.stages.push(createStageTemplate());
+            updateSingleProjectUI(pId);
+            triggerChange();
+
+            requestAnimationFrame(() => {
+                const container = document.getElementById(`scroll-${pId}`);
+                if (!container) return;
+
+                const addBtn = document.getElementById(`add-btn-${pId}`);
+                if (!addBtn) return;
+
+                // 新增後直接滑到最右側的「＋」按鈕，強制滾動且解鎖
+                scrollStageIntoView(container, addBtn, 'smooth', currentScrollLeft, true);
+                unlockAutoScroll();
+            });
+        }
+
+        function insertStageRelative(pId, sIdx, direction = 'after') {
+            syncDataFromDOM();
+            const p = projects.find(x => x.id === pId);
+            if (!p) return;
+
+            const scrollContainer = document.getElementById(`scroll-${pId}`);
+            const currentScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+
+            const insertIdx = direction === 'before' ? sIdx : sIdx + 1;
+            p.stages.splice(insertIdx, 0, createStageTemplate());
+            p.currentStageIndex = insertIdx;
+
+            updateSingleProjectUI(pId);
+            triggerChange();
+
+            requestAnimationFrame(() => {
+                const container = document.getElementById(`scroll-${pId}`);
+                if (!container) return;
+                const stages = container.querySelectorAll('.stage-block');
+                const targetStage = stages[insertIdx];
+                if (!targetStage) return;
+                scrollStageIntoView(container, targetStage, 'smooth', currentScrollLeft, true);
+                unlockAutoScroll();
+            });
+        }
+
+        function addNewProject() {
+            const now = Date.now();
+            projects.push({ id: now, name: "新專案主題", priority: "中", baseDate: "", folderLink: "", stages: [createStageTemplate("初始階段")], currentStageIndex: 0, stageStartTime: now, isCompleted: false });
+            triggerChange(); renderUI(true);
+            setTimeout(() => focusProject(now, 'active'), 100);
+        }
+
+        function deleteProject(id) { 
+            if(confirm("確定刪除此專案？（將移至已刪除，30天後自動清除）")) { 
+                const p = projects.find(x => x.id === id);
+                if (!p) return;
+                p.isDeleted = true;
+                p.deletedAt = Date.now();
+                saveAllToStorage(true);
+            } 
+        }
+        function restoreProject(id) {
+            const p = projects.find(x => x.id === id);
+            if (!p) return;
+            p.isDeleted = false;
+            p.deletedAt = null;
+            saveAllToStorage(true);
+            setTimeout(() => focusProject(id, 'active'), 80);
+        }
+        function deleteStage(pId, sIdx) { syncDataFromDOM(); const p = projects.find(x => x.id === pId); if (p.stages.length <= 1) return alert("至少需保留一個階段"); p.stages.splice(sIdx, 1); if (p.currentStageIndex >= p.stages.length) p.currentStageIndex = p.stages.length - 1; updateSingleProjectUI(pId); triggerChange(); }
+        function copyProject(id) { syncDataFromDOM(); const p = projects.find(x => x.id === id); const n = JSON.parse(JSON.stringify(p)); n.id = Date.now(); n.isCompleted = false; n.currentStageIndex = 0; n.stageStartTime = Date.now(); projects.push(n); saveAllToStorage(); }
+        function resumeProject(id) { 
+            syncDataFromDOM(); 
+            const p = projects.find(x => x.id === id); 
+            if (!p) return; 
+            p.isCompleted = false; 
+            p.stageStartTime = Date.now(); 
+            saveAllToStorage(true); 
+            setTimeout(() => focusProject(id, 'active'), 80);
+        }
+        
+        function exportToCSV() { 
+            syncDataFromDOM(); 
+            // 匯出為 Excel 友善的 CSV（每列代表一個階段）
+            const headers = [
+                "projectId","projectName","priority","baseDate","isCompleted","isDeleted","deletedAt","currentStageIndex","stageIndex",
+                "stageName","triggerType","time","unit","freqVal","freqUnit","notified","content"
+            ];
+            const rows = [headers.join(",")];
+
+            const esc = (val) => {
+                const str = (val ?? "").toString();
+                return `"${str.replace(/"/g,'""')}"`;
+            };
+
+            projects.forEach(p => {
+                (p.stages || []).forEach((s, idx) => {
+                    rows.push([
+                        esc(p.id),
+                        esc(p.name),
+                        esc(p.priority),
+                        esc(p.baseDate || ""),
+                        esc(p.isCompleted ? "1" : "0"),
+                        esc(p.isDeleted ? "1" : "0"),
+                        esc(p.deletedAt || ""),
+                        esc(p.currentStageIndex),
+                        esc(idx),
+                        esc(s.name),
+                        esc(s.triggerType),
+                        esc(s.time),
+                        esc(s.unit),
+                        esc(s.freqVal),
+                        esc(s.freqUnit),
+                        esc(s.notified ? "1" : "0"),
+                        esc(s.content || "")
+                    ].join(","));
+                });
+            });
+
+            const csv = "\uFEFF" + rows.join("\n");
+            const link = document.createElement("a"); 
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); 
+            link.download = "Project_v35.csv"; 
+            link.click(); 
+        }
+
+        // ===== CALENDAR FUNCTIONS =====
+        function showCalendar() {
+            currentCalendarDate = new Date();
+            renderCalendar();
+            document.getElementById('calendar-modal').style.display = 'block';
+        }
+
+        function closeCalendar() {
+            document.getElementById('calendar-modal').style.display = 'none';
+        }
+
+        function switchCalendarView(view) {
+            currentCalendarView = view;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${view}`).classList.add('active');
+            renderCalendar();
+        }
+
+        function navigateCalendar(direction) {
+            if (currentCalendarView === 'month') {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+            } else if (currentCalendarView === 'week') {
+                currentCalendarDate.setDate(currentCalendarDate.getDate() + (direction * 7));
+            } else {
+                currentCalendarDate.setDate(currentCalendarDate.getDate() + direction);
+            }
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const title = document.getElementById('calendar-title');
+            
+            if (currentCalendarView === 'month') {
+                renderMonthView(grid, title);
+            } else if (currentCalendarView === 'week') {
+                renderWeekView(grid, title);
+            } else {
+                renderDayView(grid, title);
+            }
+        }
+
+        function renderMonthView(grid, title) {
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const today = new Date();
+            
+            title.textContent = `${year}年 ${month + 1}月`;
+            
+            let html = '<div class="grid grid-cols-7 gap-1">';
+            ['日', '一', '二', '三', '四', '五', '六'].forEach(day => {
+                html += `<div class="text-center font-bold text-sm py-2">${day}</div>`;
+            });
+            
+            const startDay = firstDay.getDay();
+            for (let i = 0; i < startDay; i++) {
+                const prevDate = new Date(year, month, -startDay + i + 1);
+                html += generateDayCell(prevDate, true);
+            }
+            
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const date = new Date(year, month, day);
+                const isToday = date.toDateString() === today.toDateString();
+                html += generateDayCell(date, false, isToday);
+            }
+            
+            html += '</div>';
+            grid.innerHTML = html;
+        }
+
+        function renderWeekView(grid, title) {
+            const startOfWeek = new Date(currentCalendarDate);
+            startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+            
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(endOfWeek.getDate() + 6);
+            
+            title.textContent = `${startOfWeek.getMonth() + 1}月${startOfWeek.getDate()}日 - ${endOfWeek.getMonth() + 1}月${endOfWeek.getDate()}日`;
+            
+            let html = '<div class="grid grid-cols-7 gap-2">';
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(startOfWeek);
+                date.setDate(date.getDate() + i);
+                const isToday = date.toDateString() === new Date().toDateString();
+                html += generateDayCell(date, false, isToday, true);
+            }
+            html += '</div>';
+            grid.innerHTML = html;
+        }
+
+        function renderDayView(grid, title) {
+            const date = currentCalendarDate;
+            title.textContent = `${date.getFullYear()}年 ${date.getMonth() + 1}月 ${date.getDate()}日`;
+            
+            const events = getEventsForDate(date);
+            let html = '<div class="space-y-3">';
+            
+            if (events.length === 0) {
+                html += '<p class="text-gray-400 text-center py-8">此日無專案事項</p>';
+            } else {
+                events.forEach(event => {
+                    html += `
+                        <div class="p-4 border rounded-xl hover:bg-gray-50">
+                            <div class="font-bold text-sm mb-1">${event.projectName}</div>
+                            <div class="text-xs text-gray-600">${event.stageName}</div>
+                            <div class="text-[10px] text-gray-400 mt-2">優先度: ${event.priority}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += '</div>';
+            grid.innerHTML = html;
+        }
+
+        function generateDayCell(date, isOtherMonth, isToday = false, isLarge = false) {
+            const events = getEventsForDate(date);
+            const classes = ['calendar-day'];
+            if (isOtherMonth) classes.push('other-month');
+            if (isToday) classes.push('today');
+            
+            let html = `<div class="${classes.join(' ')}">`;
+            html += `<div class="font-bold text-xs mb-1">${date.getDate()}</div>`;
+            
+            events.slice(0, isLarge ? 5 : 2).forEach(event => {
+                const priorityClass = `priority-${event.priority}`;
+                html += `<div class="calendar-event ${priorityClass}" title="${event.projectName} - ${event.stageName}">${event.projectName.substring(0, 8)}${event.projectName.length > 8 ? '...' : ''}</div>`;
+            });
+            
+            if (events.length > (isLarge ? 5 : 2)) {
+                html += `<div class="text-[9px] text-gray-400 mt-1">+${events.length - (isLarge ? 5 : 2)} 更多</div>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function getEventsForDate(date) {
+            const events = [];
+            const dateStr = date.toDateString();
+            
+            projects.filter(p => !p.isCompleted && p.baseDate).forEach(p => {
+                const baseDate = new Date(p.baseDate);
+                
+                // 1. 顯示基準日本身
+                if (baseDate.toDateString() === dateStr) {
+                    events.push({
+                        projectName: p.name,
+                        stageName: '📍 基準日',
+                        priority: p.priority
+                    });
+                }
+                
+                // 2. 只顯示當前階段的提醒日期
+                const currentStage = p.stages[p.currentStageIndex];
+                if (currentStage && currentStage.triggerType === 'base') {
+                    const offset = parseInt(currentStage.time) || 0;
+                    let offsetMs = 0;
+                    
+                    if (currentStage.unit === 'd') {
+                        offsetMs = offset * 86400000;
+                    } else if (currentStage.unit === 'h') {
+                        offsetMs = offset * 3600000;
+                    } else if (currentStage.unit === 'm') {
+                        offsetMs = offset * 60000;
+                    }
+                    
+                    // 正數 = 基準日後；負數 = 基準日前
+                    const reminderDate = new Date(baseDate.getTime() + offsetMs);
+                    
+                    if (reminderDate.toDateString() === dateStr) {
+                        events.push({
+                            projectName: p.name,
+                            stageName: `${currentStage.name} (第${p.currentStageIndex + 1}階段 - 當前)`,
+                            priority: p.priority
+                        });
+                    }
+                }
+            });
+            
+            return events;
+        }
+
+        // ===== IMPORT FUNCTIONS =====
+        function importFromCSV() {
+            document.getElementById('import-modal').style.display = 'block';
+        }
+
+        function closeImport() {
+            document.getElementById('import-modal').style.display = 'none';
+        }
+
+        function processImport() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('請選擇檔案');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                // 優先嘗試 JSON（完整資料）
+                try {
+                    const parsed = JSON.parse(text);
+                    if (Array.isArray(parsed)) {
+                        projects = parsed;
+                        saveAllToStorage();
+                        closeImport();
+                        alert(`成功匯入 ${parsed.length} 個專案（JSON）。`);
+                        return;
+                    }
+                } catch (err) {
+                    // 若非 JSON，則 fallback CSV
+                }
+
+                // CSV 匯入（每列一個階段）
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                if (!lines.length) return alert('檔案內容為空');
+                const header = lines[0].split(',').map(h => h.replace(/(^"|"$)/g,'').trim());
+                const idxOf = (key) => header.indexOf(key);
+                const h = {
+                    projectId: idxOf("projectId"),
+                    projectName: idxOf("projectName"),
+                    priority: idxOf("priority"),
+                    baseDate: idxOf("baseDate"),
+                    isCompleted: idxOf("isCompleted"),
+                    isDeleted: idxOf("isDeleted"),
+                    deletedAt: idxOf("deletedAt"),
+                    currentStageIndex: idxOf("currentStageIndex"),
+                    stageIndex: idxOf("stageIndex"),
+                    stageName: idxOf("stageName"),
+                    triggerType: idxOf("triggerType"),
+                    time: idxOf("time"),
+                    unit: idxOf("unit"),
+                    freqVal: idxOf("freqVal"),
+                    freqUnit: idxOf("freqUnit"),
+                    notified: idxOf("notified"),
+                    content: idxOf("content")
+                };
+
+                const projectsMap = new Map();
+
+                const parseCsvLine = (line) => {
+                    const cells = [];
+                    let cur = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const ch = line[i];
+                        if (ch === '"' ) {
+                            if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+                            else inQuotes = !inQuotes;
+                        } else if (ch === ',' && !inQuotes) {
+                            cells.push(cur);
+                            cur = '';
+                        } else {
+                            cur += ch;
+                        }
+                    }
+                    cells.push(cur);
+                    return cells;
+                };
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cells = parseCsvLine(lines[i]).map(c => c.replace(/^\s+|\s+$/g,''));
+                    if (!cells.length || cells.every(c => c === '')) continue;
+                    const projectName = h.projectName >= 0 ? cells[h.projectName] : `專案${i}`;
+                    const projectKey = (h.projectId >= 0 && cells[h.projectId]) ? cells[h.projectId] : `${projectName}-${i}`;
+                    if (!projectsMap.has(projectKey)) {
+                        projectsMap.set(projectKey, {
+                            id: Date.now() + i,
+                            name: projectName || `專案${i}`,
+                            priority: ['急','中','緩','未開始'].includes(cells[h.priority]||'') ? cells[h.priority] : '中',
+                            baseDate: h.baseDate >=0 ? cells[h.baseDate] : "",
+                            stages: [],
+                            currentStageIndex: 0,
+                            stageStartTime: Date.now(),
+                            isCompleted: h.isCompleted>=0 ? cells[h.isCompleted] === '1' : false,
+                            isDeleted: h.isDeleted>=0 ? cells[h.isDeleted] === '1' : false,
+                            deletedAt: h.deletedAt>=0 ? Number(cells[h.deletedAt]) || Date.now() : null
+                        });
+                    }
+                    const proj = projectsMap.get(projectKey);
+                    const stageObj = {
+                        name: h.stageName>=0 ? cells[h.stageName] : '初始階段',
+                        triggerType: h.triggerType>=0 ? cells[h.triggerType] : 'start',
+                        time: h.time>=0 ? cells[h.time] : '1',
+                        unit: h.unit>=0 ? cells[h.unit] : 'm',
+                        freqVal: h.freqVal>=0 ? cells[h.freqVal] : '0',
+                        freqUnit: h.freqUnit>=0 ? cells[h.freqUnit] : '永不',
+                        notified: h.notified>=0 ? cells[h.notified] === '1' : false,
+                        content: h.content>=0 ? cells[h.content].replace(/(^"|"$)/g,'') : ''
+                    };
+                    proj.stages.push(stageObj);
+                    if (h.currentStageIndex >=0 && cells[h.currentStageIndex]) {
+                        const idx = parseInt(cells[h.currentStageIndex]);
+                        if (!isNaN(idx)) proj.currentStageIndex = Math.min(Math.max(idx,0), proj.stages.length-1);
+                    }
+                }
+
+                projects = Array.from(projectsMap.values());
+                saveAllToStorage();
+                closeImport();
+                alert(`成功匯入 ${projects.length} 個專案（CSV）。`);
+            };
+            
+            reader.readAsText(file);
+        }
+
+        window.onclick = function(event) {
+            const calModal = document.getElementById('calendar-modal');
+            const impModal = document.getElementById('import-modal');
+            
+            if (event.target === calModal) closeCalendar();
+            if (event.target === impModal) closeImport();
+        }
+
+        initSignatureGuard();
+        renderUI(true);
+    </script>
+</body>
+</html>
