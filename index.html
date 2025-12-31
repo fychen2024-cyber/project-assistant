@@ -147,7 +147,7 @@
     </div>
 
     <footer id="signature-footer" class="text-center text-xs text-gray-500 mt-12 pb-6 select-none">
-        <span id="signature-text">by 逍遙楓 @2025</span>
+        <span id="signature-text">by 逍遙楓@2025</span>
     </footer>
 
     <!-- Calendar Modal -->
@@ -185,7 +185,7 @@
 
     <script>
         const SIGNATURE_PASSWORD = 'Fy000000++';
-        const SIGNATURE_TEXT = 'by 逍遙楓 @2025';
+        const SIGNATURE_TEXT = 'by 逍遙楓@2025';
 
         let projects = JSON.parse(localStorage.getItem('apple_pm_v33')) || [];
         let isEditing = false;
@@ -485,6 +485,7 @@
                         <div class="card p-4 flex justify-between items-center text-xs">
                             <span class="font-semibold text-gray-600">${p.name} (結案)</span>
                             <div class="flex gap-4">
+                                <button onclick="resumeProject(${p.id})" class="text-green-600 font-bold">繼續編輯</button>
                                 <button onclick="copyProject(${p.id})" class="text-blue-500 font-bold">重啟</button>
                                 <button onclick="deleteProject(${p.id})" class="text-red-500 font-bold">刪除資料</button>
                             </div>
@@ -707,7 +708,11 @@
                         <div class="flex gap-2 text-[10px]">
                             <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'before')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在前插入</button>
                             <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'after')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在後插入</button>
-                        </div>` : ''}
+                        </div>` : `
+                        <div class="flex gap-2 text-[10px]">
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'before')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在前插入</button>
+                            <button onclick="event.stopPropagation(); insertStageRelative(${p.id}, ${idx}, 'after')" class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-50">在後插入</button>
+                        </div>`}
                 </div>
             </div>`;
     }
@@ -848,6 +853,15 @@
         }
         function deleteStage(pId, sIdx) { syncDataFromDOM(); const p = projects.find(x => x.id === pId); if (p.stages.length <= 1) return alert("至少需保留一個階段"); p.stages.splice(sIdx, 1); if (p.currentStageIndex >= p.stages.length) p.currentStageIndex = p.stages.length - 1; updateSingleProjectUI(pId); triggerChange(); }
         function copyProject(id) { syncDataFromDOM(); const p = projects.find(x => x.id === id); const n = JSON.parse(JSON.stringify(p)); n.id = Date.now(); n.isCompleted = false; n.currentStageIndex = 0; n.stageStartTime = Date.now(); projects.push(n); saveAllToStorage(); }
+        function resumeProject(id) { 
+            syncDataFromDOM(); 
+            const p = projects.find(x => x.id === id); 
+            if (!p) return; 
+            p.isCompleted = false; 
+            p.stageStartTime = Date.now(); 
+            saveAllToStorage(true); 
+            setTimeout(() => focusProject(id, 'active'), 80);
+        }
         
         function exportToCSV() { 
             syncDataFromDOM(); 
