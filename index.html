@@ -2297,38 +2297,151 @@
             syncDataFromDOM(); 
             // 匯出為 Excel 友善的 CSV（每列代表一個階段）
             const headers = [
-                "projectId","projectName","priority","baseDate","isCompleted","isDeleted","deletedAt","currentStageIndex","stageIndex",
-                "stageName","triggerType","time","unit","freqVal","freqUnit","notified","content"
+                "projectId","projectName","priority","baseDate","folderLink","isCompleted","isDeleted","deletedAt",
+                "currentStageIndex","currentSubProjectId","isMainProjectHidden",
+                "note","noteHeight","stageStartTime",
+                "subProjectId","subProjectName","subProjectBaseDate","subProjectCurrentStageIndex","subProjectStageStartTime","subProjectIsCompleted",
+                "subProjectNote","subProjectNoteHeight",
+                "stageIndex","stageName","triggerType","time","unit","freqVal","freqUnit","notified","content"
             ];
             const rows = [headers.join(",")];
 
             const esc = (val) => {
-                const str = (val ?? "").toString();
+                if (val === null || val === undefined) return '""';
+                const str = val.toString();
                 return `"${str.replace(/"/g,'""')}"`;
             };
 
             projects.forEach(p => {
-                (p.stages || []).forEach((s, idx) => {
+                // 匯出主專案的階段
+                const mainStages = getCurrentStages(p);
+                if (mainStages && mainStages.length > 0) {
+                    mainStages.forEach((s, idx) => {
+                        rows.push([
+                            esc(p.id),
+                            esc(p.name),
+                            esc(p.priority),
+                            esc(p.baseDate || ""),
+                            esc(p.folderLink || ""),
+                            esc(p.isCompleted ? "1" : "0"),
+                            esc(p.isDeleted ? "1" : "0"),
+                            esc(p.deletedAt || ""),
+                            esc(getCurrentStageIndex(p)),
+                            esc(p.currentSubProjectId || ""),
+                            esc(p.isMainProjectHidden ? "1" : "0"),
+                            esc(p.note || ""),
+                            esc(p.noteHeight !== null ? p.noteHeight : ""),
+                            esc(p.stageStartTime || ""),
+                            esc(""), // subProjectId (主專案階段為空)
+                            esc(""), // subProjectName
+                            esc(""), // subProjectBaseDate
+                            esc(""), // subProjectCurrentStageIndex
+                            esc(""), // subProjectStageStartTime
+                            esc(""), // subProjectIsCompleted
+                            esc(""), // subProjectNote
+                            esc(""), // subProjectNoteHeight
+                            esc(idx),
+                            esc(s.name),
+                            esc(s.triggerType),
+                            esc(s.time),
+                            esc(s.unit),
+                            esc(s.freqVal),
+                            esc(s.freqUnit),
+                            esc(s.notified ? "1" : "0"),
+                            esc(s.content || "")
+                        ].join(","));
+                    });
+                } else {
+                    // 如果主專案沒有階段，至少匯出一行專案資訊
                     rows.push([
                         esc(p.id),
                         esc(p.name),
                         esc(p.priority),
                         esc(p.baseDate || ""),
+                        esc(p.folderLink || ""),
                         esc(p.isCompleted ? "1" : "0"),
                         esc(p.isDeleted ? "1" : "0"),
                         esc(p.deletedAt || ""),
-                        esc(p.currentStageIndex),
-                        esc(idx),
-                        esc(s.name),
-                        esc(s.triggerType),
-                        esc(s.time),
-                        esc(s.unit),
-                        esc(s.freqVal),
-                        esc(s.freqUnit),
-                        esc(s.notified ? "1" : "0"),
-                        esc(s.content || "")
+                        esc(0),
+                        esc(p.currentSubProjectId || ""),
+                        esc(p.isMainProjectHidden ? "1" : "0"),
+                        esc(p.note || ""),
+                        esc(p.noteHeight !== null ? p.noteHeight : ""),
+                        esc(p.stageStartTime || ""),
+                        esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""),
+                        esc(0), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc("")
                     ].join(","));
-                });
+                }
+                
+                // 匯出子專案的階段
+                if (p.subProjects && p.subProjects.length > 0) {
+                    p.subProjects.forEach(subProject => {
+                        const subStages = subProject.stages || [];
+                        if (subStages.length > 0) {
+                            subStages.forEach((s, idx) => {
+                                rows.push([
+                                    esc(p.id),
+                                    esc(p.name),
+                                    esc(p.priority),
+                                    esc(p.baseDate || ""),
+                                    esc(p.folderLink || ""),
+                                    esc(p.isCompleted ? "1" : "0"),
+                                    esc(p.isDeleted ? "1" : "0"),
+                                    esc(p.deletedAt || ""),
+                                    esc(subProject.currentStageIndex || 0),
+                                    esc(subProject.id),
+                                    esc(p.isMainProjectHidden ? "1" : "0"),
+                                    esc(""), // 主專案備註（子專案階段時為空）
+                                    esc(""), // 主專案備註高度
+                                    esc(subProject.stageStartTime || ""),
+                                    esc(subProject.id),
+                                    esc(subProject.name),
+                                    esc(subProject.baseDate || ""),
+                                    esc(subProject.currentStageIndex || 0),
+                                    esc(subProject.stageStartTime || ""),
+                                    esc(subProject.isCompleted ? "1" : "0"),
+                                    esc(subProject.note || ""),
+                                    esc(subProject.noteHeight !== null ? subProject.noteHeight : ""),
+                                    esc(idx),
+                                    esc(s.name),
+                                    esc(s.triggerType),
+                                    esc(s.time),
+                                    esc(s.unit),
+                                    esc(s.freqVal),
+                                    esc(s.freqUnit),
+                                    esc(s.notified ? "1" : "0"),
+                                    esc(s.content || "")
+                                ].join(","));
+                            });
+                        } else {
+                            // 如果子專案沒有階段，至少匯出一行子專案資訊
+                            rows.push([
+                                esc(p.id),
+                                esc(p.name),
+                                esc(p.priority),
+                                esc(p.baseDate || ""),
+                                esc(p.folderLink || ""),
+                                esc(p.isCompleted ? "1" : "0"),
+                                esc(p.isDeleted ? "1" : "0"),
+                                esc(p.deletedAt || ""),
+                                esc(0),
+                                esc(subProject.id),
+                                esc(p.isMainProjectHidden ? "1" : "0"),
+                                esc(""), esc(""),
+                                esc(subProject.stageStartTime || ""),
+                                esc(subProject.id),
+                                esc(subProject.name),
+                                esc(subProject.baseDate || ""),
+                                esc(subProject.currentStageIndex || 0),
+                                esc(subProject.stageStartTime || ""),
+                                esc(subProject.isCompleted ? "1" : "0"),
+                                esc(subProject.note || ""),
+                                esc(subProject.noteHeight !== null ? subProject.noteHeight : ""),
+                                esc(0), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc(""), esc("")
+                            ].join(","));
+                        }
+                    });
+                }
             });
 
             const csv = "\uFEFF" + rows.join("\n");
@@ -2614,12 +2727,13 @@
                             return true;
                         });
                         projects = projects.concat(newProjects);
-                        saveAllToStorage();
+                        saveAllToStorage(true);
                         closeImport();
                         const message = duplicateCount > 0 
                             ? `成功匯入 ${newProjects.length} 個專案（JSON），跳過 ${duplicateCount} 個重複專案，現有專案已保留。`
                             : `成功匯入 ${newProjects.length} 個專案（JSON），現有專案已保留。`;
                         alert(message);
+                        renderUI(true);
                         return;
                     }
                 } catch (err) {
@@ -2636,10 +2750,24 @@
                     projectName: idxOf("projectName"),
                     priority: idxOf("priority"),
                     baseDate: idxOf("baseDate"),
+                    folderLink: idxOf("folderLink"),
                     isCompleted: idxOf("isCompleted"),
                     isDeleted: idxOf("isDeleted"),
                     deletedAt: idxOf("deletedAt"),
                     currentStageIndex: idxOf("currentStageIndex"),
+                    currentSubProjectId: idxOf("currentSubProjectId"),
+                    isMainProjectHidden: idxOf("isMainProjectHidden"),
+                    note: idxOf("note"),
+                    noteHeight: idxOf("noteHeight"),
+                    stageStartTime: idxOf("stageStartTime"),
+                    subProjectId: idxOf("subProjectId"),
+                    subProjectName: idxOf("subProjectName"),
+                    subProjectBaseDate: idxOf("subProjectBaseDate"),
+                    subProjectCurrentStageIndex: idxOf("subProjectCurrentStageIndex"),
+                    subProjectStageStartTime: idxOf("subProjectStageStartTime"),
+                    subProjectIsCompleted: idxOf("subProjectIsCompleted"),
+                    subProjectNote: idxOf("subProjectNote"),
+                    subProjectNoteHeight: idxOf("subProjectNoteHeight"),
                     stageIndex: idxOf("stageIndex"),
                     stageName: idxOf("stageName"),
                     triggerType: idxOf("triggerType"),
@@ -2676,53 +2804,106 @@
                 for (let i = 1; i < lines.length; i++) {
                     const cells = parseCsvLine(lines[i]).map(c => c.replace(/^\s+|\s+$/g,''));
                     if (!cells.length || cells.every(c => c === '')) continue;
+                    
+                    const projectId = h.projectId >= 0 && cells[h.projectId] ? cells[h.projectId] : null;
                     const projectName = h.projectName >= 0 ? cells[h.projectName] : `專案${i}`;
-                    const projectKey = (h.projectId >= 0 && cells[h.projectId]) ? cells[h.projectId] : `${projectName}-${i}`;
+                    const projectKey = projectId || `${projectName}-${i}`;
+                    
+                    // 檢查是否有子專案 ID
+                    const subProjectId = h.subProjectId >= 0 && cells[h.subProjectId] ? cells[h.subProjectId] : null;
+                    
                     if (!projectsMap.has(projectKey)) {
+                        const projectIdValue = projectId ? (isNaN(Number(projectId)) ? Date.now() + i : Number(projectId)) : Date.now() + i;
                         projectsMap.set(projectKey, {
-                            id: Date.now() + i,
+                            id: projectIdValue,
                             name: projectName || `專案${i}`,
                             priority: ['急','中','緩','未開始'].includes(cells[h.priority]||'') ? cells[h.priority] : '中',
                             baseDate: h.baseDate >=0 ? cells[h.baseDate] : "",
+                            folderLink: h.folderLink >=0 ? cells[h.folderLink] : "",
                             stages: [],
                             currentStageIndex: 0,
-                            stageStartTime: Date.now(),
+                            stageStartTime: h.stageStartTime >=0 && cells[h.stageStartTime] ? Number(cells[h.stageStartTime]) : Date.now(),
                             isCompleted: h.isCompleted>=0 ? cells[h.isCompleted] === '1' : false,
                             isDeleted: h.isDeleted>=0 ? cells[h.isDeleted] === '1' : false,
-                            deletedAt: h.deletedAt>=0 ? Number(cells[h.deletedAt]) || Date.now() : null,
+                            deletedAt: h.deletedAt>=0 && cells[h.deletedAt] ? Number(cells[h.deletedAt]) : null,
                             subProjects: [],
-                            currentSubProjectId: null
+                            currentSubProjectId: h.currentSubProjectId >=0 && cells[h.currentSubProjectId] ? (cells[h.currentSubProjectId] ? Number(cells[h.currentSubProjectId]) : null) : null,
+                            isMainProjectHidden: h.isMainProjectHidden>=0 ? cells[h.isMainProjectHidden] === '1' : false,
+                            note: h.note >=0 ? cells[h.note].replace(/(^"|"$)/g,'') : '',
+                            noteHeight: h.noteHeight >=0 && cells[h.noteHeight] ? Number(cells[h.noteHeight]) : null
                         });
                     }
+                    
                     const proj = projectsMap.get(projectKey);
-                    const stageObj = {
-                        name: h.stageName>=0 ? cells[h.stageName] : '初始階段',
-                        triggerType: h.triggerType>=0 ? cells[h.triggerType] : 'none',
-                        time: h.time>=0 ? cells[h.time] : '1',
-                        unit: h.unit>=0 ? cells[h.unit] : 'm',
-                        freqVal: h.freqVal>=0 ? cells[h.freqVal] : '0',
-                        freqUnit: h.freqUnit>=0 ? cells[h.freqUnit] : '永不',
-                        notified: h.notified>=0 ? cells[h.notified] === '1' : false,
-                        content: h.content>=0 ? cells[h.content].replace(/(^"|"$)/g,'') : ''
-                    };
-                    // 數據遷移：如果 triggerType 是 'base'，需要根據 baseDateType 轉換
-                    const baseDateTypeIdx = idxOf("baseDateType");
-                    if (stageObj.triggerType === 'base' && baseDateTypeIdx >= 0) {
-                        const baseDateType = cells[baseDateTypeIdx];
-                        if (baseDateType === 'sub') {
-                            stageObj.triggerType = 'sub';
-                        } else {
-                            stageObj.triggerType = 'main';
-                        }
+                    
+                    // 更新專案的其他屬性（從第一行或最新行）
+                    if (h.folderLink >=0 && cells[h.folderLink]) proj.folderLink = cells[h.folderLink];
+                    if (h.currentSubProjectId >=0 && cells[h.currentSubProjectId]) {
+                        const subId = cells[h.currentSubProjectId];
+                        proj.currentSubProjectId = subId ? Number(subId) : null;
                     }
+                    if (h.isMainProjectHidden>=0) proj.isMainProjectHidden = cells[h.isMainProjectHidden] === '1';
+                    if (h.note >=0 && cells[h.note] && !subProjectId) proj.note = cells[h.note].replace(/(^"|"$)/g,'');
+                    if (h.noteHeight >=0 && cells[h.noteHeight] && !subProjectId) {
+                        const height = cells[h.noteHeight];
+                        proj.noteHeight = height ? Number(height) : null;
+                    }
+                    
+                    // 處理階段
+                    const stageObj = {
+                        name: h.stageName>=0 && cells[h.stageName] ? cells[h.stageName] : '初始階段',
+                        triggerType: h.triggerType>=0 && cells[h.triggerType] ? cells[h.triggerType] : 'none',
+                        time: h.time>=0 && cells[h.time] ? cells[h.time] : '1',
+                        unit: h.unit>=0 && cells[h.unit] ? cells[h.unit] : 'm',
+                        freqVal: h.freqVal>=0 && cells[h.freqVal] ? cells[h.freqVal] : '0',
+                        freqUnit: h.freqUnit>=0 && cells[h.freqUnit] ? cells[h.freqUnit] : '永不',
+                        notified: h.notified>=0 ? cells[h.notified] === '1' : false,
+                        content: h.content>=0 && cells[h.content] ? cells[h.content].replace(/(^"|"$)/g,'') : ''
+                    };
+                    
                     // 確保 triggerType 有效
                     if (!stageObj.triggerType || !['none', 'start', 'main', 'sub'].includes(stageObj.triggerType)) {
                         stageObj.triggerType = 'none';
                     }
-                    proj.stages.push(stageObj);
-                    if (h.currentStageIndex >=0 && cells[h.currentStageIndex]) {
-                        const idx = parseInt(cells[h.currentStageIndex]);
-                        if (!isNaN(idx)) proj.currentStageIndex = Math.min(Math.max(idx,0), proj.stages.length-1);
+                    
+                    // 如果有子專案 ID，這是子專案的階段
+                    if (subProjectId) {
+                        let subProject = proj.subProjects.find(sp => sp.id === Number(subProjectId));
+                        if (!subProject) {
+                            subProject = {
+                                id: Number(subProjectId),
+                                name: h.subProjectName >=0 && cells[h.subProjectName] ? cells[h.subProjectName] : `子專案${subProjectId}`,
+                                baseDate: h.subProjectBaseDate >=0 ? cells[h.subProjectBaseDate] : "",
+                                stages: [],
+                                currentStageIndex: 0,
+                                stageStartTime: h.subProjectStageStartTime >=0 && cells[h.subProjectStageStartTime] ? Number(cells[h.subProjectStageStartTime]) : Date.now(),
+                                isCompleted: h.subProjectIsCompleted>=0 ? cells[h.subProjectIsCompleted] === '1' : false,
+                                note: h.subProjectNote >=0 ? cells[h.subProjectNote].replace(/(^"|"$)/g,'') : '',
+                                noteHeight: h.subProjectNoteHeight >=0 && cells[h.subProjectNoteHeight] ? Number(cells[h.subProjectNoteHeight]) : null
+                            };
+                            proj.subProjects.push(subProject);
+                        }
+                        // 更新子專案屬性
+                        if (h.subProjectName >=0 && cells[h.subProjectName]) subProject.name = cells[h.subProjectName];
+                        if (h.subProjectBaseDate >=0) subProject.baseDate = cells[h.subProjectBaseDate];
+                        if (h.subProjectNote >=0 && cells[h.subProjectNote]) subProject.note = cells[h.subProjectNote].replace(/(^"|"$)/g,'');
+                        if (h.subProjectNoteHeight >=0 && cells[h.subProjectNoteHeight]) {
+                            const height = cells[h.subProjectNoteHeight];
+                            subProject.noteHeight = height ? Number(height) : null;
+                        }
+                        
+                        subProject.stages.push(stageObj);
+                        if (h.subProjectCurrentStageIndex >=0 && cells[h.subProjectCurrentStageIndex]) {
+                            const idx = parseInt(cells[h.subProjectCurrentStageIndex]);
+                            if (!isNaN(idx)) subProject.currentStageIndex = Math.min(Math.max(idx,0), subProject.stages.length-1);
+                        }
+                    } else {
+                        // 這是主專案的階段
+                        proj.stages.push(stageObj);
+                        if (h.currentStageIndex >=0 && cells[h.currentStageIndex]) {
+                            const idx = parseInt(cells[h.currentStageIndex]);
+                            if (!isNaN(idx)) proj.currentStageIndex = Math.min(Math.max(idx,0), proj.stages.length-1);
+                        }
                     }
                 }
 
@@ -2745,15 +2926,20 @@
                     return true;
                 });
                 projects = projects.concat(importedProjects);
-                saveAllToStorage();
+                saveAllToStorage(true);
                 closeImport();
                 const message = duplicateCount > 0 
                     ? `成功匯入 ${importedProjects.length} 個專案（CSV），跳過 ${duplicateCount} 個重複專案，現有專案已保留。`
                     : `成功匯入 ${importedProjects.length} 個專案（CSV），現有專案已保留。`;
                 alert(message);
+                renderUI(true);
             };
             
-            reader.readAsText(file);
+            reader.onerror = function() {
+                alert('讀取檔案時發生錯誤，請確認檔案格式是否正確。');
+            };
+            
+            reader.readAsText(file, 'UTF-8');
         }
 
         window.onclick = function(event) {
