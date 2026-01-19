@@ -2267,8 +2267,8 @@
             draggedProjectId = projectId;
             draggedSubProjectId = subProjectId;
             
-            // 設置拖曳效果
-            event.dataTransfer.effectAllowed = 'move';
+            // 設置拖曳效果 - 支援複製和移動
+            event.dataTransfer.effectAllowed = 'copyMove';
             event.dataTransfer.setData('text/html', event.currentTarget.innerHTML);
             
             // 添加視覺回饋 - 半透明
@@ -2303,7 +2303,8 @@
             if (event.preventDefault) {
                 event.preventDefault();
             }
-            event.dataTransfer.dropEffect = 'move';
+            // 根據 Ctrl 鍵決定是複製還是移動
+            event.dataTransfer.dropEffect = event.ctrlKey ? 'copy' : 'move';
             return false;
         }
         
@@ -2312,7 +2313,7 @@
             
             // 檢查是否可以拖曳到這個位置
             if (!target.classList.contains('sub-project-tab')) return;
-            if (target === draggedElement) return;
+            if (target === draggedElement && !event.ctrlKey) return; // 按住 Ctrl 可以複製到原位置旁邊
             
             // 不允許拖曳到主專案頁籤
             const targetSubProjectId = target.dataset.subProjectId;
@@ -2322,16 +2323,17 @@
             const targetProjectId = parseInt(target.dataset.projectId);
             if (targetProjectId !== draggedProjectId) return;
             
-            // 顯示插入位置提示（藍色邊框線）
+            // 顯示插入位置提示（按住 Ctrl 顯示綠色表示複製，否則藍色表示移動）
+            const borderColor = event.ctrlKey ? '#10b981' : '#3b82f6'; // 綠色表示複製，藍色表示移動
             const rect = target.getBoundingClientRect();
             const mouseX = event.clientX;
             const midpoint = rect.left + rect.width / 2;
             
             if (mouseX < midpoint) {
-                target.style.borderLeft = '3px solid #3b82f6';
+                target.style.borderLeft = `3px solid ${borderColor}`;
                 target.style.borderRight = '';
             } else {
-                target.style.borderRight = '3px solid #3b82f6';
+                target.style.borderRight = `3px solid ${borderColor}`;
                 target.style.borderLeft = '';
             }
         }
@@ -2353,7 +2355,7 @@
                 return false;
             }
             
-            if (draggedSubProjectId === targetSubProjectId) {
+            if (draggedSubProjectId === targetSubProjectId && !event.ctrlKey) {
                 return false;
             }
             
@@ -2380,15 +2382,49 @@
             const midpoint = rect.left + rect.width / 2;
             const insertBefore = mouseX < midpoint;
             
-            // 移動子專案
-            const [draggedItem] = project.subProjects.splice(draggedIndex, 1);
-            let newIndex = project.subProjects.findIndex(sp => sp.id === targetSubProjectId);
+            // 檢查是否按住 Ctrl 鍵（複製模式）
+            const isCopyMode = event.ctrlKey;
             
-            if (!insertBefore) {
-                newIndex += 1;
+            if (isCopyMode) {
+                // 複製模式：深拷貝子專案
+                const draggedItem = project.subProjects[draggedIndex];
+                const copiedItem = JSON.parse(JSON.stringify(draggedItem)); // 深拷貝
+                
+                // 生成新的 ID
+                copiedItem.id = Date.now();
+                
+                // 修改名稱表示這是複製的
+                const nameSuffix = ' - 複製';
+                if (!copiedItem.name.endsWith(nameSuffix)) {
+                    copiedItem.name = copiedItem.name + nameSuffix;
+                }
+                
+                // 重置子專案狀態
+                copiedItem.currentStageIndex = 0;
+                copiedItem.stageStartTime = Date.now();
+                copiedItem.isCompleted = false;
+                
+                // 插入到目標位置
+                let newIndex = targetIndex;
+                if (!insertBefore) {
+                    newIndex += 1;
+                }
+                
+                project.subProjects.splice(newIndex, 0, copiedItem);
+                
+                // 切換到新複製的子專案
+                project.currentSubProjectId = copiedItem.id;
+            } else {
+                // 移動模式：移動子專案
+                const [draggedItem] = project.subProjects.splice(draggedIndex, 1);
+                let newIndex = project.subProjects.findIndex(sp => sp.id === targetSubProjectId);
+                
+                if (!insertBefore) {
+                    newIndex += 1;
+                }
+                
+                project.subProjects.splice(newIndex, 0, draggedItem);
             }
-            
-            project.subProjects.splice(newIndex, 0, draggedItem);
             
             // 重新分配 sortOrder
             project.subProjects.forEach((sp, index) => {
